@@ -111,4 +111,41 @@ class FinanceViewModel : ViewModel() {
         }
     }
 
+    suspend fun getFinancialAnalysis(): String {
+        val expenses = _expenses.value
+        val debts = _debts.value
+        val totalExpenses = expenses.sumOf { it.amount }
+        val totalDebt = debts.sumOf { it.totalAmount }
+        val spendingByCategory = expenses.groupBy { it.category ?: "Uncategorized" }
+            .mapValues { it.value.sumOf { it.amount } }
+        val debtDetails = debts.joinToString("\n") {
+            "${it.description}: ${it.totalAmount} due ${it.dueDate?.let { SimpleDateFormat("MM/dd/yyyy", Locale.US).format(it) } ?: "N/A"}"
+        }
+
+        val prompt = """
+        Analyze the user’s financial data:
+        - Total monthly expenses: $totalExpenses KES
+        - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
+        - Total debt: $totalDebt KES
+        - Debt details: $debtDetails
+
+        Provide a detailed report with:
+        1. A summary of their financial health.
+        2. Where they’re spending the most and if it’s sustainable.
+        3. Debt repayment priorities (e.g., what to pay first).
+        4. Any urgent actions (e.g., overdue payments).
+        5. Friendly, actionable advice to improve their finances.
+
+        Use a warm, encouraging tone and include specific numbers where possible.
+    """.trimIndent()
+
+        return try {
+            val response = generativeModel.generateContent(content { text(prompt) })
+            response.text ?: "Sorry, I couldn’t analyze your data right now."
+        } catch (e: Exception) {
+            Log.e("FinanceViewModel", "AI Analysis failed: ${e.message}")
+            "Oops! Something went wrong with the analysis."
+        }
+    }
+
 }

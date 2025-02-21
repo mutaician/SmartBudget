@@ -67,10 +67,8 @@ import java.util.Locale
 fun FinanceDashboardScreen(
     financeViewModel: FinanceViewModel = viewModel()
 ) {
-    val placeholderPrompt = stringResource(R.string.prompt_placeholder)
-    val placeholderResult = stringResource(R.string.results_placeholder)
-    var prompt by rememberSaveable { mutableStateOf(placeholderPrompt) }
-    var result by rememberSaveable { mutableStateOf(placeholderResult) }
+//    var prompt by rememberSaveable { mutableStateOf(placeholderPrompt) }
+//    var result by rememberSaveable { mutableStateOf(placeholderResult) }
     val uiState by financeViewModel.uiState.collectAsState()
     var descriptionText by rememberSaveable { mutableStateOf("") }
     var amountText by rememberSaveable { mutableStateOf("") }
@@ -429,53 +427,53 @@ fun FinanceDashboardScreen(
         }
 
         // Keep the existing Row with TextField and Button (for now) - but move it BELOW "Reports"
-        Row(
-            modifier = Modifier.padding(all = 16.dp)
+        var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
+        var isLoadingAnalysis by remember { mutableStateOf(false) }
+        Text(
+            text = "AI Analysis",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
-            TextField(
-                value = prompt,
-                label = { Text(stringResource(R.string.label_prompt)) },
-                onValueChange = { prompt = it },
-                modifier = Modifier
-                    .weight(0.8f)
-                    .padding(end = 16.dp)
-                    .align(Alignment.CenterVertically)
-            )
-
             Button(
                 onClick = {
-                    // add later
+                    scope.launch {
+                        isLoadingAnalysis = true
+                        aiAnalysisResult = financeViewModel.getFinancialAnalysis()
+                        isLoadingAnalysis = false
+                    }
                 },
-                enabled = prompt.isNotEmpty(),
+                enabled = !isLoadingAnalysis,
                 modifier = Modifier
-                    .align(Alignment.CenterVertically)
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
             ) {
-                Text(text = stringResource(R.string.action_go))
+                if (isLoadingAnalysis) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.requiredSize(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Get AI Analysis")
+                }
+            }
+            if (aiAnalysisResult.isNotEmpty()) {
+                Text(
+                    text = aiAnalysisResult,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth()
+                )
             }
         }
 
-        // Keep the existing result Text area and loading indicator (for now) - move it BELOW the Row
-        if (uiState is UiState.Loading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-        } else {
-            var textColor = MaterialTheme.colorScheme.onSurface
-            if (uiState is UiState.Error) {
-                textColor = MaterialTheme.colorScheme.error
-                result = (uiState as UiState.Error).errorMessage
-            } else if (uiState is UiState.Success) {
-                textColor = MaterialTheme.colorScheme.onSurface
-                result = (uiState as UiState.Success).outputText
-            }
-            Text(
-                text = result,
-                textAlign = TextAlign.Start,
-                color = textColor,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(16.dp)
-                    .fillMaxWidth()
-            )
-        }
     }
 }
 
