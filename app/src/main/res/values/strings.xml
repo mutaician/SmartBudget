@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">SmartBudget</string>
+    <string name="action_go">Go</string>
+    <string name="dashboard_title">SmartBudget Dashboard</string>
+    <string name="label_prompt">Prompt</string>
+    <string name="prompt_placeholder">Analyze for me these expenses and debts and provide useful insights</string>
+    <string name="results_placeholder">(Results will appear here)</string>
+</resources>
