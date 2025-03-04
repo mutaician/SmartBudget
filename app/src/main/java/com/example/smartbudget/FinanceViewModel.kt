@@ -55,6 +55,19 @@ class FinanceViewModel : ViewModel() {
     private val _categorySpending = MutableStateFlow<Map<String, Double>>(emptyMap())
     val categorySpending: StateFlow<Map<String, Double>> = _categorySpending.asStateFlow()
 
+    fun loadTestData() {
+        _expenses.value = listOf(
+            Expense("Groceries", 400.0, "Food"),
+            Expense("Bus Fare", 50.0, "Transportation"),
+            Expense("Dinner Out", 150.0, "Food")
+        )
+        _debts.value = listOf(
+            Debt("Credit Card", 200.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("03/01/2025")),
+            Debt("Car Loan", 500.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("04/15/2025"))
+        )
+        updateCategorySpending() // Update spending summary
+    }
+
     fun addExpense(description: String, amount: Double, category: String?) {
         val newExpense = Expense(description = description, amount = amount, category = category)
         _expenses.value += newExpense

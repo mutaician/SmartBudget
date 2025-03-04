@@ -3,8 +3,10 @@ package com.example.smartbudget
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -49,6 +51,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -57,6 +61,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -67,8 +72,6 @@ import java.util.Locale
 fun FinanceDashboardScreen(
     financeViewModel: FinanceViewModel = viewModel()
 ) {
-//    var prompt by rememberSaveable { mutableStateOf(placeholderPrompt) }
-//    var result by rememberSaveable { mutableStateOf(placeholderResult) }
     val uiState by financeViewModel.uiState.collectAsState()
     var descriptionText by rememberSaveable { mutableStateOf("") }
     var amountText by rememberSaveable { mutableStateOf("") }
@@ -122,15 +125,15 @@ fun FinanceDashboardScreen(
                 }
             }
         ) {
-            DatePicker(state = datePickerState) // Just the DatePicker composable
+            DatePicker(state = datePickerState)
         }
     }
 
-
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
     ) {
         Text(
             text = stringResource(R.string.dashboard_title),
@@ -138,7 +141,6 @@ fun FinanceDashboardScreen(
             modifier = Modifier.padding(16.dp)
         )
 
-        // --- Placeholder Sections ---
         Text(
             text = "Expense Input",
             style = MaterialTheme.typography.titleMedium,
@@ -394,7 +396,6 @@ fun FinanceDashboardScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        // We will add Insights display here later
 
         Text(
             text = "Reports",
@@ -426,51 +427,79 @@ fun FinanceDashboardScreen(
             }
         }
 
-        // Keep the existing Row with TextField and Button (for now) - but move it BELOW "Reports"
-        var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
-        var isLoadingAnalysis by remember { mutableStateOf(false) }
-        Text(
-            text = "AI Analysis",
-            style = MaterialTheme.typography.titleMedium,
+
+        Button(
+            onClick = { financeViewModel.loadTestData() },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
         ) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        isLoadingAnalysis = true
-                        aiAnalysisResult = financeViewModel.getFinancialAnalysis()
-                        isLoadingAnalysis = false
+            Text("Load Test Data")
+        }
+
+        var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
+        var isLoadingAnalysis by remember { mutableStateOf(false) }
+        var aiSectionOffset by remember { mutableStateOf(0f) }
+        Box(
+            modifier = Modifier
+                .onGloballyPositioned { coordinates ->
+                    aiSectionOffset = coordinates.positionInParent().y
+                }
+        ) {
+            Column {
+                Text(
+                    text = "AI Analysis",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isLoadingAnalysis = true
+                                aiAnalysisResult = financeViewModel.getFinancialAnalysis()
+                                isLoadingAnalysis = false
+                            }
+                        },
+                        enabled = !isLoadingAnalysis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        if (isLoadingAnalysis) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.requiredSize(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text("Get AI Analysis")
+                        }
                     }
-                },
-                enabled = !isLoadingAnalysis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            ) {
-                if (isLoadingAnalysis) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.requiredSize(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Get AI Analysis")
+                    if (aiAnalysisResult.isNotEmpty() && !isLoadingAnalysis) {
+                        Text(
+                            text = aiAnalysisResult,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
+                                .padding(16.dp),
+                            lineHeight = 20.sp
+                        )
+                    }
                 }
             }
+        }
+
+        LaunchedEffect(aiAnalysisResult) {
             if (aiAnalysisResult.isNotEmpty()) {
-                Text(
-                    text = aiAnalysisResult,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .fillMaxWidth()
-                )
+                scrollState.animateScrollTo(aiSectionOffset.toInt())
             }
         }
 
