@@ -154,6 +154,7 @@ class FinanceViewModel : ViewModel() {
 
         return try {
             val response = generativeModel.generateContent(content { text(prompt) })
+            Log.d("FinanceViewModel", "AI Analysis response: ${response.text}")
             response.text ?: "Sorry, I couldn’t analyze your data right now."
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "AI Analysis failed: ${e.message}")

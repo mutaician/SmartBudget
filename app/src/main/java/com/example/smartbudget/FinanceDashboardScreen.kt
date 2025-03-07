@@ -3,12 +3,11 @@ package com.example.smartbudget
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,14 +18,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -57,49 +58,267 @@ import java.util.Locale
 fun FinanceDashboardScreen(
     financeViewModel: FinanceViewModel = viewModel()
 ) {
-    val uiState by financeViewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(bottom = 24.dp)
+    ) {
+        DashboardHeader()
+        ExpenseInputSection(financeViewModel)
+        SectionDivider()
+        ExpenseHistorySection(financeViewModel)
+        SectionDivider()
+        DebtInputSection(financeViewModel)
+        SectionDivider()
+        DebtSummarySection(financeViewModel)
+        SectionDivider()
+        InsightsSection(financeViewModel)
+        SectionDivider()
+        AIAnalysisSection(financeViewModel, scrollState)
+    }
+}
+
+@Composable
+private fun DashboardHeader() {
+    Text(
+        text = stringResource(R.string.dashboard_title),
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(16.dp)
+    )
+}
+
+@Composable
+private fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp, horizontal = 8.dp),
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp, top = 8.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun ExpenseInputSection(financeViewModel: FinanceViewModel) {
     var descriptionText by rememberSaveable { mutableStateOf("") }
     var amountText by rememberSaveable { mutableStateOf("") }
     var categoryText by rememberSaveable { mutableStateOf("") }
-    val expensesList by financeViewModel.expenses.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val suggestedCategory by financeViewModel.categorySuggestion.collectAsState()
+
     val isAddExpenseButtonEnabled by remember {
         derivedStateOf {
             descriptionText.isNotBlank() && amountText.isNotBlank()
         }
     }
-    val suggestedCategory by financeViewModel.categorySuggestion.collectAsState()
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    @OptIn(ExperimentalMaterial3Api::class)
-    val datePickerState = rememberDatePickerState() // Add datePickerState here, with @OptIn annotation
-    var selectedDueDate by rememberSaveable { mutableStateOf("") }
-    var debtDescriptionText by rememberSaveable { mutableStateOf("") } // State for Debt Description TextField
-    val debtsList by financeViewModel.debts.collectAsState()
-    var debtAmountText by rememberSaveable { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) } // Add loading state for expense addition
-    val scope = rememberCoroutineScope()
-    val categorySpending by financeViewModel.categorySpending.collectAsState()
 
     LaunchedEffect(suggestedCategory) {
-        val category = suggestedCategory // Capture the value locally
+        val category = suggestedCategory
         if (!category.isNullOrBlank() && categoryText.isBlank()) {
             categoryText = category
         }
     }
-    @OptIn(ExperimentalMaterial3Api::class)
+
+    SectionTitle("Expense Input")
+
+    ExpenseInputField(
+        value = descriptionText,
+        onValueChange = { descriptionText = it },
+        label = "Description"
+    )
+
+    ExpenseInputField(
+        value = amountText,
+        onValueChange = { amountText = it },
+        label = "Amount",
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+    )
+
+    ExpenseInputField(
+        value = categoryText,
+        onValueChange = { categoryText = it },
+        label = "Category (Suggested)"
+    )
+
+    LoadingButton(
+        text = "Add Expense",
+        isLoading = isLoading,
+        onClick = {
+            val amountDouble = amountText.toDoubleOrNull() ?: 0.0
+            scope.launch {
+                isLoading = true
+                val category = categoryText.ifBlank {
+                    financeViewModel.fetchCategoryForExpense(descriptionText)
+                }
+                financeViewModel.addExpense(descriptionText, amountDouble, category)
+                descriptionText = ""
+                amountText = ""
+                categoryText = ""
+                isLoading = false
+            }
+        },
+        enabled = isAddExpenseButtonEnabled
+    )
+}
+
+@Composable
+private fun ExpenseInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    singleLine: Boolean = true
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        keyboardOptions = keyboardOptions,
+        singleLine = singleLine,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun LoadingButton(
+    text: String,
+    loadingText: String = "Processing...",
+    isLoading: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled && !isLoading,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .size(20.dp)
+                    .padding(end = 8.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+            Text(loadingText)
+        } else {
+            Text(text)
+        }
+    }
+}
+
+@Composable
+private fun ExpenseHistorySection(financeViewModel: FinanceViewModel) {
+    val expensesList by financeViewModel.expenses.collectAsState()
+
+    SectionTitle("Expense History")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        TableHeader(
+            "Description" to 1f,
+            "Category" to 1f,
+            "Amount (KES)" to 0.7f
+        )
+
+        if (expensesList.isEmpty()) {
+            EmptyState("No expenses recorded yet.")
+        } else {
+            expensesList.forEach { expense ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = expense.description,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = expense.category ?: "",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "KES ${String.format("%.2f", expense.amount)}",
+                        modifier = Modifier.weight(0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TableHeader(vararg columns: Pair<String, Float>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(4.dp)
+            )
+            .padding(8.dp)
+    ) {
+        columns.forEach { (text, weight) ->
+            Text(
+                text = text,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(weight)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DebtInputSection(financeViewModel: FinanceViewModel) {
+    var debtDescriptionText by rememberSaveable { mutableStateOf("") }
+    var debtAmountText by rememberSaveable { mutableStateOf("") }
+    var selectedDueDate by rememberSaveable { mutableStateOf("") }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+
+    val isAddDebtButtonEnabled by remember {
+        derivedStateOf {
+            debtDescriptionText.isNotBlank() && debtAmountText.isNotBlank()
+        }
+    }
+
     if (showDatePickerDialog) {
         DatePickerDialog(
-            onDismissRequest = { showDatePickerDialog = false }, // Dismiss on outside click/back button
+            onDismissRequest = { showDatePickerDialog = false },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showDatePickerDialog = false // Dismiss dialog
+                        showDatePickerDialog = false
                         datePickerState.selectedDateMillis?.let { millis ->
                             val date = Date(millis)
                             val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US)
-                            selectedDueDate = dateFormatter.format(date) // Format and update selectedDueDate
+                            selectedDueDate = dateFormatter.format(date)
                         }
-                    },
-                    enabled = true // Button always enabled in this simple example
+                    }
                 ) {
                     Text("OK")
                 }
@@ -114,286 +333,129 @@ fun FinanceDashboardScreen(
         }
     }
 
-    val scrollState = rememberScrollState()
+    SectionTitle("Debt Input")
+
+    ExpenseInputField(
+        value = debtDescriptionText,
+        onValueChange = { debtDescriptionText = it },
+        label = "Debt Description"
+    )
+
+    ExpenseInputField(
+        value = debtAmountText,
+        onValueChange = { debtAmountText = it },
+        label = "Total Debt Amount",
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+    )
+
+    OutlinedTextField(
+        value = selectedDueDate,
+        onValueChange = { },
+        label = { Text("Due Date (MM/DD/YYYY)") },
+        readOnly = true,
+        trailingIcon = {
+            IconButton(onClick = { showDatePickerDialog = true }) {
+                Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Select Date")
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+
+    Button(
+        onClick = {
+            val amountDouble = debtAmountText.toDoubleOrNull() ?: 0.0
+            financeViewModel.addDebt(
+                debtDescriptionText,
+                amountDouble,
+                selectedDueDate
+            )
+            debtDescriptionText = ""
+            debtAmountText = ""
+            selectedDueDate = ""
+        },
+        enabled = isAddDebtButtonEnabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text("Add Debt")
+    }
+}
+
+@Composable
+private fun DebtSummarySection(financeViewModel: FinanceViewModel) {
+    val debtsList by financeViewModel.debts.collectAsState()
+
+    SectionTitle("Debt Summary")
+
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        TableHeader(
+            "Description" to 1f,
+            "Due Date" to 1f,
+            "Amount (KES)" to 0.7f
+        )
+
+        if (debtsList.isEmpty()) {
+            EmptyState("No debts recorded yet.")
+        } else {
+            debtsList.forEach { debt ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+                    val formattedDate = debt.dueDate?.let { dateFormatter.format(it) } ?: "N/A"
+                    Text(text = debt.description, modifier = Modifier.weight(1f))
+                    Text(text = formattedDate, modifier = Modifier.weight(1f))
+                    Text(text = "KES ${String.format("%.2f", debt.totalAmount)}", modifier = Modifier.weight(0.7f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = stringResource(R.string.dashboard_title),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun InsightsSection(financeViewModel: FinanceViewModel) {
+    val categorySpending by financeViewModel.categorySpending.collectAsState()
+
+    SectionTitle("Spending Insights")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        TableHeader(
+            "Category" to 1f,
+            "Amount (KES)" to 0.7f
         )
 
-        Text(
-            text = "Expense Input",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp, top = 24.dp, bottom = 8.dp)
-        )
-        TextField(
-            value = descriptionText,
-            onValueChange = { descriptionText = it },
-            label = { Text("Description") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-        TextField(
-            value = amountText,
-            onValueChange = { amountText = it },
-            label = { Text("Amount") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-        TextField(
-            value = categoryText,
-            onValueChange = { categoryText = it },
-            label = { Text("Category (Suggested)") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-        Button(
-            onClick = {
-                val amountDouble = amountText.toDoubleOrNull() ?: 0.0
-                scope.launch {
-                    isLoading = true // Show loading state
-                    val category = if (categoryText.isBlank()) {
-                        // Fetch category from Gemini API
-                        financeViewModel.fetchCategoryForExpense(descriptionText)
-                    } else {
-                        categoryText // Use the manually entered category
-                    }
-                    // Add expense after category is received
-                    financeViewModel.addExpense(descriptionText, amountDouble, category)
-                    // Reset fields
-                    descriptionText = ""
-                    amountText = ""
-                    categoryText = ""
-                    isLoading = false // Hide loading state
-                }
-            },
-            enabled = isAddExpenseButtonEnabled && !isLoading, // Disable button while loading
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-                .padding(bottom = 8.dp)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.requiredSize(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text("Add Expense")
-            }
-        }
-
-        Text(
-            text = "Expense History",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(top = 24.dp, bottom = 8.dp)
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-
-            Row(
-                 modifier = Modifier
-                     .fillMaxWidth()
-                     .padding(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "Description",
-                        fontWeight = FontWeight.W400,
-                        modifier = Modifier.weight(1f)
-                    )
-                    // to fix later, loading delays
-                    Text(
-                        text = "Category",
-                        fontWeight = FontWeight.W400,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "Amount (KES)",
-                        fontWeight = FontWeight.W400,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-
-            expensesList.forEach { expense ->
-                 Row(
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .padding(vertical = 4.dp)
-                 ) {
-                     Text(
-                         text = expense.description,
-                         modifier = Modifier.weight(1f)
-                     )
-                     Text(
-                         text = expense.category ?: "",
-                         modifier = Modifier.weight(1f)
-                     )
-                     Text(
-                         text = "KES ${String.format("%.2f", expense.amount)}",
-                         modifier = Modifier.padding(start = 8.dp)
-                     )
-                 }
-            }
-        }
-
-
-        Text(
-            text = "Debt Input",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(PaddingValues(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp))
-        )
-
-        TextField(
-            value = debtDescriptionText,
-            onValueChange = { debtDescriptionText = it },
-            label = { Text("Debt Description") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-        TextField(
-            value = debtAmountText,
-            onValueChange = { debtAmountText = it },
-            label = { Text("Total Debt Amount") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), // Number keyboard
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-        val isAddDebtButtonEnabled by remember {
-            derivedStateOf {
-                debtDescriptionText.isNotBlank() && debtAmountText.isNotBlank()
-            }
-        }
-        OutlinedTextField( // Use OutlinedTextField instead of TextField
-            value = selectedDueDate, // Display selected date
-            onValueChange = { /* Do nothing, read-only */ },
-            label = { Text("Due Date (MM/DD/YYYY)") },
-            readOnly = true, // Still read-only
-            trailingIcon = { // Add a trailing icon (calendar icon)
-                IconButton(onClick = { showDatePickerDialog = true }) { // Open DatePickerDialog on icon click
-                    Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Select Date") // Calendar icon
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-
-
-        Button(
-            onClick = {
-                val amountDouble = debtAmountText.toDoubleOrNull() ?: 0.0
-                financeViewModel.addDebt(
-                    debtDescriptionText,
-                    amountDouble,
-                    selectedDueDate
-                )
-                debtDescriptionText = ""
-                debtAmountText = ""
-                selectedDueDate = ""
-            },
-            enabled = isAddDebtButtonEnabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .padding(bottom = 8.dp)
-        ) {
-            Text("Add Debt")
-        }
-
-        Text(
-            text = "Debt Summary",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp, bottom = 8.dp)
-                .padding(horizontal = 16.dp)
-        )
-
-         Column(
-             modifier = Modifier
-                 .fillMaxWidth()
-                 .padding(horizontal = 16.dp)
-         ) {
-
-             Row(
-                 modifier = Modifier
-                     .fillMaxWidth()
-                     .padding(vertical = 8.dp)
-             ) {
-                 Text(
-                     text = "Description",
-                     fontWeight = FontWeight.W400,
-                     modifier = Modifier.weight(1f)
-                 )
-                 Text(
-                     text = "Due Date",
-                     fontWeight = FontWeight.W400,
-                     modifier = Modifier.weight(1f)
-                 )
-                 Text(
-                     text = "Amount (KES)",
-                     fontWeight = FontWeight.W400,
-                     modifier = Modifier.padding(start = 8.dp)
-                 )
-             }
-             debtsList.forEach { debt ->
-                 Row(
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .padding(vertical = 4.dp)
-                 ) {
-                     val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US)
-                     val formattedDate = debt.dueDate?.let { dateFormatter.format(it) } ?: "N/A"
-                     Text(text = debt.description, modifier = Modifier.weight(1f))
-                     Text(text = formattedDate, modifier = Modifier.weight(1f))
-                     Text(text = "KES ${String.format("%.2f", debt.totalAmount)}", modifier = Modifier.padding(start = 8.dp))
-                 }
-             }
-         }
-
-
-
-        Text(
-            text = "Insights",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
-        Text(
-            text = "Reports",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
+        if (categorySpending.isEmpty()) {
+            EmptyState("No spending data available.")
+        } else {
             categorySpending.forEach { (category, amount) ->
                 Row(
                     modifier = Modifier
@@ -406,91 +468,83 @@ fun FinanceDashboardScreen(
                     )
                     Text(
                         text = "KES ${String.format("%.2f", amount)}",
-                        modifier = Modifier.padding(start = 8.dp)
+                        modifier = Modifier.weight(0.7f)
                     )
                 }
             }
         }
+    }
 
-
-        Button(
-            onClick = { financeViewModel.loadTestData() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Text("Load Test Data")
-        }
-
-        var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
-        var isLoadingAnalysis by remember { mutableStateOf(false) }
-        var aiSectionOffset by remember { mutableStateOf(0f) }
-        Box(
-            modifier = Modifier
-                .onGloballyPositioned { coordinates ->
-                    aiSectionOffset = coordinates.positionInParent().y
-                }
-        ) {
-            Column {
-                Text(
-                    text = "AI Analysis",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                isLoadingAnalysis = true
-                                aiAnalysisResult = financeViewModel.getFinancialAnalysis()
-                                isLoadingAnalysis = false
-                            }
-                        },
-                        enabled = !isLoadingAnalysis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        if (isLoadingAnalysis) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.requiredSize(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text("Get AI Analysis")
-                        }
-                    }
-                    if (aiAnalysisResult.isNotEmpty() && !isLoadingAnalysis) {
-                        Text(
-                            text = aiAnalysisResult,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier
-                                .padding(vertical = 8.dp)
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
-                                .padding(16.dp),
-                            lineHeight = 20.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        LaunchedEffect(aiAnalysisResult) {
-            if (aiAnalysisResult.isNotEmpty()) {
-                scrollState.animateScrollTo(aiSectionOffset.toInt())
-            }
-        }
-
+    Button(
+        onClick = { financeViewModel.loadTestData() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+    ) {
+        Text("Load Test Data")
     }
 }
 
+@Composable
+private fun AIAnalysisSection(financeViewModel: FinanceViewModel, scrollState: androidx.compose.foundation.ScrollState) {
+    var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
+    var isLoadingAnalysis by remember { mutableStateOf(false) }
+    var aiSectionOffset by remember { mutableStateOf(0f) }
+    val scope = rememberCoroutineScope()
+
+    Box(
+        modifier = Modifier
+            .onGloballyPositioned { coordinates ->
+                aiSectionOffset = coordinates.positionInParent().y
+            }
+    ) {
+        Column {
+            SectionTitle("AI Analysis")
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                LoadingButton(
+                    text = "Get AI Analysis",
+                    isLoading = isLoadingAnalysis,
+                    onClick = {
+                        scope.launch {
+                            isLoadingAnalysis = true
+                            try {
+                                aiAnalysisResult = financeViewModel.getFinancialAnalysis()
+                            } catch (e: Exception) {
+                                aiAnalysisResult = "Analysis failed: ${e.message ?: "Unknown error"}"
+                            } finally {
+                                isLoadingAnalysis = false
+                            }
+                        }
+                    }
+                )
+
+                if (aiAnalysisResult.isNotEmpty() && !isLoadingAnalysis) {
+                    Text(
+                        text = aiAnalysisResult,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .padding(vertical = 8.dp)
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
+                            .padding(16.dp),
+                        lineHeight = 20.sp
+                    )
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(aiAnalysisResult) {
+        if (aiAnalysisResult.isNotEmpty()) {
+            scrollState.animateScrollTo(aiSectionOffset.toInt())
+        }
+    }
+}
 
 @Preview(showSystemUi = true)
 @Composable
