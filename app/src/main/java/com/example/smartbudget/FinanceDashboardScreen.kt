@@ -75,7 +75,10 @@ fun FinanceDashboardScreen(
         SectionDivider()
         DebtSummarySection(financeViewModel)
         SectionDivider()
-        InsightsSection(financeViewModel)
+        GoalsInputSection(financeViewModel)
+        GoalsSummarySection(financeViewModel)
+        SectionDivider()
+        loadTestData(financeViewModel)
         SectionDivider()
         AIAnalysisSection(financeViewModel, scrollState)
     }
@@ -421,6 +424,136 @@ private fun DebtSummarySection(financeViewModel: FinanceViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GoalsInputSection(financeViewModel: FinanceViewModel) {
+    var goalDescriptionText by rememberSaveable { mutableStateOf("") }
+    var goalAmountText by rememberSaveable { mutableStateOf("") }
+    var selectedTargetDate by rememberSaveable { mutableStateOf("") }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+
+    val isAddGoalButtonEnabled by remember {
+        derivedStateOf {
+            goalDescriptionText.isNotBlank() && goalAmountText.isNotBlank()
+        }
+    }
+
+    if (showDatePickerDialog) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePickerDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDatePickerDialog = false
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val date = Date(millis)
+                            val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+                            selectedTargetDate = dateFormatter.format(date)
+                        }
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePickerDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    SectionTitle("Financial Goals")
+
+    ExpenseInputField(
+        value = goalDescriptionText,
+        onValueChange = { goalDescriptionText = it },
+        label = "Goal Description"
+    )
+
+    ExpenseInputField(
+        value = goalAmountText,
+        onValueChange = { goalAmountText = it },
+        label = "Target Amount",
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+    )
+
+    OutlinedTextField(
+        value = selectedTargetDate,
+        onValueChange = { },
+        label = { Text("Target Date (MM/DD/YYYY, optional)") },
+        readOnly = true,
+        trailingIcon = {
+            IconButton(onClick = { showDatePickerDialog = true }) {
+                Icon(imageVector = Icons.Filled.DateRange, contentDescription = "Select Date")
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+
+    Button(
+        onClick = {
+            val amountDouble = goalAmountText.toDoubleOrNull() ?: 0.0
+            financeViewModel.addGoal(
+                goalDescriptionText,
+                amountDouble,
+                selectedTargetDate.takeIf { it.isNotBlank() }
+            )
+            goalDescriptionText = ""
+            goalAmountText = ""
+            selectedTargetDate = ""
+        },
+        enabled = isAddGoalButtonEnabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text("Add Goal")
+    }
+}
+
+
+
+@Composable
+private fun GoalsSummarySection(financeViewModel: FinanceViewModel) {
+    val goalsList by financeViewModel.goals.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        TableHeader(
+            "Goal" to 1f,
+            "Target (KES)" to 0.7f,
+            "Due Date" to 1f
+        )
+
+        if (goalsList.isEmpty()) {
+            EmptyState("No goals set yet.")
+        } else {
+            goalsList.forEach { goal ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+                    val formattedDate = goal.targetDate?.let { dateFormatter.format(it) } ?: "N/A"
+                    Text(text = goal.description, modifier = Modifier.weight(1f))
+                    Text(text = "KES ${String.format("%.2f", goal.targetAmount)}", modifier = Modifier.weight(0.7f))
+                    Text(text = formattedDate, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EmptyState(message: String) {
     Box(
@@ -438,43 +571,7 @@ private fun EmptyState(message: String) {
 }
 
 @Composable
-private fun InsightsSection(financeViewModel: FinanceViewModel) {
-    val categorySpending by financeViewModel.categorySpending.collectAsState()
-
-    SectionTitle("Spending Insights")
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        TableHeader(
-            "Category" to 1f,
-            "Amount (KES)" to 0.7f
-        )
-
-        if (categorySpending.isEmpty()) {
-            EmptyState("No spending data available.")
-        } else {
-            categorySpending.forEach { (category, amount) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    Text(
-                        text = category,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "KES ${String.format("%.2f", amount)}",
-                        modifier = Modifier.weight(0.7f)
-                    )
-                }
-            }
-        }
-    }
-
+private fun loadTestData(financeViewModel: FinanceViewModel) {
     Button(
         onClick = { financeViewModel.loadTestData() },
         modifier = Modifier

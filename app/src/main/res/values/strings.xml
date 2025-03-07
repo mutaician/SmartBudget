@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SmartBudget</string>
+    <string name="app_name">Smart Budget</string>
     <string name="action_go">Go</string>
     <string name="dashboard_title">SmartBudget Dashboard</string>
     <string name="label_prompt">Prompt</string>

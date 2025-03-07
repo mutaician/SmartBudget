@@ -1,19 +1,14 @@
 package com.example.smartbudget
 
-import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import java.text.ParseException
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -29,6 +24,12 @@ data class Debt(
     val description: String,
     val totalAmount: Double,
     val dueDate: Date? = null,
+)
+
+data class Goal(
+    val description: String,
+    val targetAmount: Double,
+    val targetDate: Date? = null
 )
 
 
@@ -53,7 +54,9 @@ class FinanceViewModel : ViewModel() {
     val debts: StateFlow<List<Debt>> = _debts.asStateFlow() // Public StateFlow for debts
 
     private val _categorySpending = MutableStateFlow<Map<String, Double>>(emptyMap())
-    val categorySpending: StateFlow<Map<String, Double>> = _categorySpending.asStateFlow()
+
+    private val _goals = MutableStateFlow<List<Goal>>(emptyList())
+    val goals: StateFlow<List<Goal>> = _goals.asStateFlow()
 
     fun loadTestData() {
         _expenses.value = listOf(
@@ -65,7 +68,12 @@ class FinanceViewModel : ViewModel() {
             Debt("Credit Card", 200.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("03/01/2025")),
             Debt("Car Loan", 500.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("04/15/2025"))
         )
-        updateCategorySpending() // Update spending summary
+
+        _goals.value = listOf(
+            Goal("Vacation", 1000.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("06/01/2025")),
+            Goal("Emergency Fund", 500.0, null)
+        )
+        updateCategorySpending()
     }
 
     fun addExpense(description: String, amount: Double, category: String?) {
@@ -90,6 +98,14 @@ class FinanceViewModel : ViewModel() {
         _debts.value = _debts.value + newDebt // Add new debt to the list
         Log.d("FinanceViewModel", "Debt added: $newDebt") // Log the new debt
         Log.d("FinanceViewModel", "Updated debts  list: ${_debts.value}")
+    }
+
+    fun addGoal(description: String, targetAmount: Double, targetDate: String?) {
+        val date = targetDate?.let {
+            SimpleDateFormat("MM/dd/yyyy", Locale.US).parse(it)
+        }
+        val newGoal = Goal(description, targetAmount, date)
+        _goals.value += newGoal
     }
 
     private fun updateCategorySpending() {
@@ -127,12 +143,16 @@ class FinanceViewModel : ViewModel() {
     suspend fun getFinancialAnalysis(): String {
         val expenses = _expenses.value
         val debts = _debts.value
+        val goals = _goals.value
         val totalExpenses = expenses.sumOf { it.amount }
         val totalDebt = debts.sumOf { it.totalAmount }
         val spendingByCategory = expenses.groupBy { it.category ?: "Uncategorized" }
             .mapValues { it.value.sumOf { it.amount } }
         val debtDetails = debts.joinToString("\n") {
-            "${it.description}: ${it.totalAmount} due ${it.dueDate?.let { SimpleDateFormat("MM/dd/yyyy", Locale.US).format(it) } ?: "N/A"}"
+            "${it.description}: ${it.totalAmount} KES due ${it.dueDate?.let { SimpleDateFormat("MM/dd/yyyy", Locale.US).format(it) } ?: "N/A"}"
+        }
+        val goalDetails = goals.joinToString("\n") {
+            "${it.description}: ${it.targetAmount} KES${it.targetDate?.let { " due ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(it)}" } ?: ""}"
         }
 
         val prompt = """
@@ -141,20 +161,20 @@ class FinanceViewModel : ViewModel() {
         - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
         - Total debt: $totalDebt KES
         - Debt details: $debtDetails
+        - Financial goals: $goalDetails
 
         Write a response in this exact style:
-        - Start with a friendly greeting about their spending and debt, saying if they’re doing okay.
-        - Next, point out where most of their money is going, keeping it casual.
-        - Then, suggest which debt to pay first and why, mentioning due dates.
-        - Follow with a quick note if anything’s overdue or not.
-        - End with a simple, friendly tip to save money.
+        - Start with a friendly note about their spending and debt, saying if they’re doing okay.
+        - Point out where most of their money is going, keeping it casual.
+        - Suggest which debt to pay first and why, mentioning due dates.
+        - Note if anything’s overdue or not.
+        - End with practical suggestions to reach their goals, like cutting spending or saving more, tied to their data.
 
-        Use short paragraphs, a warm and chatty tone, and specific numbers. Avoid markdown or formal labels like 'Financial Health'.
+        Use short paragraphs, a warm and chatty tone, and specific numbers. Avoid markdown or formal labels.
     """.trimIndent()
 
         return try {
             val response = generativeModel.generateContent(content { text(prompt) })
-            Log.d("FinanceViewModel", "AI Analysis response: ${response.text}")
             response.text ?: "Sorry, I couldn’t analyze your data right now."
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "AI Analysis failed: ${e.message}")
