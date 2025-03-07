@@ -142,14 +142,14 @@ class FinanceViewModel : ViewModel() {
         - Total debt: $totalDebt KES
         - Debt details: $debtDetails
 
-        Provide a detailed report with:
-        1. A summary of their financial health.
-        2. Where they’re spending the most and if it’s sustainable.
-        3. Debt repayment priorities (e.g., what to pay first).
-        4. Any urgent actions (e.g., overdue payments).
-        5. Friendly, actionable advice to improve their finances.
+        Write a response in this exact style:
+        - Start with a friendly greeting about their spending and debt, saying if they’re doing okay.
+        - Next, point out where most of their money is going, keeping it casual.
+        - Then, suggest which debt to pay first and why, mentioning due dates.
+        - Follow with a quick note if anything’s overdue or not.
+        - End with a simple, friendly tip to save money.
 
-        Use a warm, encouraging tone and include specific numbers where possible.
+        Use short paragraphs, a warm and chatty tone, and specific numbers. Avoid markdown or formal labels like 'Financial Health'.
     """.trimIndent()
 
         return try {
