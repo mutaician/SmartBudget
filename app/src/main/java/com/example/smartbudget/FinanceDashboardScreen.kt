@@ -1,5 +1,6 @@
 package com.example.smartbudget
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,17 +15,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -56,31 +60,48 @@ import java.util.Locale
 
 @Composable
 fun FinanceDashboardScreen(
-    financeViewModel: FinanceViewModel = viewModel()
+    financeViewModel: FinanceViewModel,
+    onNavigateToChat: () -> Unit
 ) {
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(bottom = 24.dp)
-    ) {
-        DashboardHeader()
-        ExpenseInputSection(financeViewModel)
-        SectionDivider()
-        ExpenseHistorySection(financeViewModel)
-        SectionDivider()
-        DebtInputSection(financeViewModel)
-        SectionDivider()
-        DebtSummarySection(financeViewModel)
-        SectionDivider()
-        GoalsInputSection(financeViewModel)
-        GoalsSummarySection(financeViewModel)
-        SectionDivider()
-        loadTestData(financeViewModel)
-        SectionDivider()
-        AIAnalysisSection(financeViewModel, scrollState)
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onNavigateToChat,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Face,
+                    contentDescription = "Chat with AI"
+                )
+            }
+        }
+    ) { paddingValues ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(paddingValues)
+        ) {
+            DashboardHeader()
+            ExpenseInputSection(financeViewModel)
+            SectionDivider()
+            ExpenseHistorySection(financeViewModel)
+            SectionDivider()
+            DebtInputSection(financeViewModel)
+            SectionDivider()
+            DebtSummarySection(financeViewModel)
+            SectionDivider()
+            GoalsInputSection(financeViewModel)
+            GoalsSummarySection(financeViewModel)
+            SectionDivider()
+            loadTestData(financeViewModel)
+            SectionDivider()
+            AIAnalysisSection(financeViewModel, scrollState)
+        }
     }
 }
 
@@ -583,7 +604,7 @@ private fun loadTestData(financeViewModel: FinanceViewModel) {
 }
 
 @Composable
-private fun AIAnalysisSection(financeViewModel: FinanceViewModel, scrollState: androidx.compose.foundation.ScrollState) {
+private fun AIAnalysisSection(financeViewModel: FinanceViewModel, scrollState: ScrollState) {
     var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
     var isLoadingAnalysis by remember { mutableStateOf(false) }
     var aiSectionOffset by remember { mutableStateOf(0f) }
@@ -646,5 +667,8 @@ private fun AIAnalysisSection(financeViewModel: FinanceViewModel, scrollState: a
 @Preview(showSystemUi = true)
 @Composable
 fun FinanceDashboardScreenPreview() {
-    FinanceDashboardScreen()
+    FinanceDashboardScreen(
+        onNavigateToChat = {},
+        financeViewModel = TODO()
+    )
 }

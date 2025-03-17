@@ -40,7 +40,7 @@ class FinanceViewModel : ViewModel() {
         _uiState.asStateFlow()
 
     private val generativeModel = GenerativeModel(
-        modelName = "gemini-1.5-flash",
+        modelName = "gemini-2.0-flash-lite",
         apiKey = BuildConfig.apiKey
     )
 
@@ -57,6 +57,9 @@ class FinanceViewModel : ViewModel() {
 
     private val _goals = MutableStateFlow<List<Goal>>(emptyList())
     val goals: StateFlow<List<Goal>> = _goals.asStateFlow()
+
+    private val _chatHistory = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val chatHistory: StateFlow<List<Pair<String, String>>> = _chatHistory.asStateFlow()
 
     fun loadTestData() {
         _expenses.value = listOf(
@@ -119,7 +122,6 @@ class FinanceViewModel : ViewModel() {
             .groupBy { it.category ?: "Uncategorized" }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
         _categorySpending.value = spendingByCategory
-        Log.d("FinanceViewModel", "Category spending: ${_categorySpending.value}")
     }
 
     suspend fun fetchCategoryForExpense(expenseDescription: String): String {
@@ -175,10 +177,55 @@ class FinanceViewModel : ViewModel() {
 
         return try {
             val response = generativeModel.generateContent(content { text(prompt) })
-            response.text ?: "Sorry, I couldn’t analyze your data right now."
+            val result = response.text ?: "Sorry, I couldn’t analyze your data right now."
+            _chatHistory.value += Pair("Get AI Analysis", result)
+            result
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "AI Analysis failed: ${e.message}")
-            "Oops! Something went wrong with the analysis."
+            val error = "Oops! Something went wrong with the analysis."
+            _chatHistory.value += Pair("Get AI Analysis", error)
+            error
+        }
+    }
+
+    suspend fun getChatResponse(userQuery: String): String {
+        val expenses = _expenses.value
+        val debts = _debts.value
+        val goals = _goals.value
+        val totalExpenses = expenses.sumOf { it.amount }
+        val totalDebt = debts.sumOf { it.totalAmount }
+        val spendingByCategory = expenses.groupBy { it.category ?: "Uncategorized" }
+            .mapValues { it.value.sumOf { it.amount } }
+        val debtDetails = debts.joinToString("\n") {
+            "${it.description}: ${it.totalAmount} KES due ${it.dueDate?.let { SimpleDateFormat("MM/dd/yyyy", Locale.US).format(it) } ?: "N/A"}"
+        }
+        val goalDetails = goals.joinToString("\n") {
+            "${it.description}: ${it.targetAmount} KES${it.targetDate?.let { " due ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(it)}" } ?: ""}"
+        }
+
+        val prompt = """
+        The user asked: "$userQuery"
+        Their financial data:
+        - Total monthly expenses: $totalExpenses KES
+        - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
+        - Total debt: $totalDebt KES
+        - Debt details: $debtDetails
+        - Financial goals: $goalDetails
+        - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
+
+        Respond in a friendly, chatty tone with a short, helpful answer based on their data and past chats. Keep it simple, use specific numbers where relevant, and avoid markdown or formal labels.
+    """.trimIndent()
+
+        return try {
+            val response = generativeModel.generateContent(content { text(prompt) })
+            val result = response.text ?: "Hmm, I’m not sure how to answer that right now!"
+            _chatHistory.value += Pair(userQuery, result)
+            result
+        } catch (e: Exception) {
+            Log.e("FinanceViewModel", "Chat response failed: ${e.message}")
+            val error = "Oops, something went wrong with my reply!"
+            _chatHistory.value += Pair(userQuery, error)
+            error
         }
     }
 
