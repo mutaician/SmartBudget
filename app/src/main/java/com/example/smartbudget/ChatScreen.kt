@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +58,7 @@ fun ChatScreen(
         "Where’s my money going?"
     )
     val scope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -129,24 +132,29 @@ fun ChatScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        ) {
-            sampleQuestions.forEach { question ->
-                Button(
-                    onClick = {
-                        scope.launch {
-                            val response = financeViewModel.getChatResponse(question)
-                            chatInput = ""
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    Text(question)
+        if (chatHistory.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                sampleQuestions.forEach { question ->
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isLoading = true
+                                val response = financeViewModel.getChatResponse(question)
+                                chatInput = ""
+                                isLoading = false
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        enabled = !isLoading
+                    ) {
+                        Text(question)
+                    }
                 }
             }
         }
@@ -165,19 +173,29 @@ fun ChatScreen(
                     .padding(end = 8.dp),
                 singleLine = true
             )
+
             IconButton(
                 onClick = {
-                    scope.launch{
+                    scope.launch {
+                        isLoading = true
                         val response = financeViewModel.getChatResponse(chatInput)
-                        chatInput = ""
+                        chatInput = "" // Clear input after sending
+                        isLoading = false
                     }
                 },
-                enabled = chatInput.isNotBlank()
+                enabled = chatInput.isNotBlank() && !isLoading
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send Message"
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Send,
+                        contentDescription = "Send Message"
+                    )
+                }
             }
         }
     }
