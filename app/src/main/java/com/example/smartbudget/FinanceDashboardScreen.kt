@@ -22,6 +22,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -68,16 +69,23 @@ fun FinanceDashboardScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToChat,
-                modifier = Modifier.padding(16.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 32.dp, end = 16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Face,
-                    contentDescription = "Chat with AI"
-                )
+                FloatingActionButton(
+                    onClick = onNavigateToChat,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Face,
+                        contentDescription = "Chat with AI"
+                    )
+                }
             }
-        }
+        },
+//        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
 
         Column(
@@ -100,7 +108,7 @@ fun FinanceDashboardScreen(
             SectionDivider()
             loadTestData(financeViewModel)
             SectionDivider()
-            AIAnalysisSection(financeViewModel, scrollState)
+            AIAnalysisSection(financeViewModel, scrollState, onNavigateToChat)
         }
     }
 }
@@ -604,7 +612,11 @@ private fun loadTestData(financeViewModel: FinanceViewModel) {
 }
 
 @Composable
-private fun AIAnalysisSection(financeViewModel: FinanceViewModel, scrollState: ScrollState) {
+private fun AIAnalysisSection(
+    financeViewModel: FinanceViewModel,
+    scrollState: ScrollState,
+    onNavigateToChat: () -> Unit
+) {
     var aiAnalysisResult by rememberSaveable { mutableStateOf("") }
     var isLoadingAnalysis by remember { mutableStateOf(false) }
     var aiSectionOffset by remember { mutableStateOf(0f) }
@@ -642,16 +654,26 @@ private fun AIAnalysisSection(financeViewModel: FinanceViewModel, scrollState: S
                 )
 
                 if (aiAnalysisResult.isNotEmpty() && !isLoadingAnalysis) {
-                    Text(
-                        text = aiAnalysisResult,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier
-                            .padding(vertical = 8.dp)
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
-                            .padding(16.dp),
-                        lineHeight = 20.sp
-                    )
+                    Column {
+                        Text(
+                            text = aiAnalysisResult,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
+                                .padding(16.dp),
+                            lineHeight = 20.sp
+                        )
+                        Button(
+                            onClick = onNavigateToChat,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Text("Chat for More")
+                        }
+                    }
                 }
             }
         }

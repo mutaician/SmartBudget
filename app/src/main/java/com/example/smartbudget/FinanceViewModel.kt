@@ -204,17 +204,17 @@ class FinanceViewModel : ViewModel() {
         }
 
         val prompt = """
-        The user asked: "$userQuery"
-        Their financial data:
-        - Total monthly expenses: $totalExpenses KES
-        - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
-        - Total debt: $totalDebt KES
-        - Debt details: $debtDetails
-        - Financial goals: $goalDetails
-        - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
-
-        Respond in a friendly, chatty tone with a short, helpful answer based on their data and past chats. Keep it simple, use specific numbers where relevant, and avoid markdown or formal labels.
-    """.trimIndent()
+            The user asked: "$userQuery"
+            Their financial data:
+            - Total monthly expenses: $totalExpenses KES
+            - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
+            - Total debt: $totalDebt KES
+            - Debt details: $debtDetails
+            - Financial goals: $goalDetails
+            - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
+        
+            Act as a financial expert and provide a detailed, thorough response in a friendly, conversational tone. Use the user’s financial data and past chats to give personalized advice. Include specific numbers and examples where relevant, explain your reasoning, and offer actionable steps they can take. Make the response comprehensive, not short or long, and avoid markdown or formal labels.
+        """.trimIndent()
 
         return try {
             val response = generativeModel.generateContent(content { text(prompt) })
