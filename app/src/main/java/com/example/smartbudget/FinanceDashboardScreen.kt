@@ -105,8 +105,8 @@ fun FinanceDashboardScreen(
             SectionDivider()
             GoalsInputSection(financeViewModel)
             GoalsSummarySection(financeViewModel)
-            SectionDivider()
-            loadTestData(financeViewModel)
+//            SectionDivider()
+//            loadTestData(financeViewModel)
             SectionDivider()
             AIAnalysisSection(financeViewModel, scrollState, onNavigateToChat)
         }

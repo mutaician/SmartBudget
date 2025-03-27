@@ -61,22 +61,28 @@ class FinanceViewModel : ViewModel() {
     private val _chatHistory = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val chatHistory: StateFlow<List<Pair<String, String>>> = _chatHistory.asStateFlow()
 
+    // testing purposes for demo
+    init {
+        if (_expenses.value.isEmpty() && _debts.value.isEmpty() && _goals.value.isEmpty()) {
+            loadTestData()
+        }
+    }
     fun loadTestData() {
         _expenses.value = listOf(
-            Expense("Groceries", 400.0, "Food"),
-            Expense("Bus Fare", 50.0, "Transportation"),
-            Expense("Dinner Out", 150.0, "Food")
+            Expense("Mama Mboga (Veggies)", 150.0, "Food"),
+            Expense("Matatu to Campus", 70.0, "Transport"),
+            Expense("Chapo Smokie", 50.0, "Food"),
+            Expense("Airtime", 100.0, "Communication"),
+            Expense("Photocopy Notes", 30.0, "Education")
         )
         _debts.value = listOf(
-            Debt("Credit Card", 200.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("03/01/2025")),
-            Debt("Car Loan", 500.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("04/15/2025"))
+            Debt("HELB Loan", 5000.0, Date(2025 - 1900, 11, 31)),
+            Debt("Roommate Borrowed", 200.0, Date(2025 - 1900, 4, 1))
         )
-
         _goals.value = listOf(
-            Goal("Vacation", 1000.0, SimpleDateFormat("MM/dd/yyyy", Locale.US).parse("06/01/2025")),
-            Goal("Emergency Fund", 500.0, null)
+            Goal("New Laptop", 15000.0, Date(2025 - 1900, 7, 31)),
+            Goal("Graduation Party", 3000.0, Date(2025 - 1900, 11, 1))
         )
-        updateCategorySpending()
     }
 
     fun addExpense(description: String, amount: Double, category: String?) {
@@ -164,6 +170,7 @@ class FinanceViewModel : ViewModel() {
         - Total debt: $totalDebt KES
         - Debt details: $debtDetails
         - Financial goals: $goalDetails
+        - Today's date is  is ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())}
 
         Write a response in this exact style:
         - Start with a friendly note about their spending and debt, saying if they’re doing okay.
@@ -176,14 +183,16 @@ class FinanceViewModel : ViewModel() {
     """.trimIndent()
 
         return try {
+            Log.d("FinanceViewModel", "AI Analysis prompt: $prompt")
             val response = generativeModel.generateContent(content { text(prompt) })
             val result = response.text ?: "Sorry, I couldn’t analyze your data right now."
-            _chatHistory.value += Pair("Get AI Analysis", result)
+//            _chatHistory.value += Pair("Get AI Analysis", result)
+
             result
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "AI Analysis failed: ${e.message}")
             val error = "Oops! Something went wrong with the analysis."
-            _chatHistory.value += Pair("Get AI Analysis", error)
+//            _chatHistory.value += Pair("Get AI Analysis", error)
             error
         }
     }
@@ -212,11 +221,13 @@ class FinanceViewModel : ViewModel() {
             - Debt details: $debtDetails
             - Financial goals: $goalDetails
             - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
+            - Today's date is  is ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())}
         
             Act as a financial expert and provide a detailed, thorough response in a friendly, conversational tone. Use the user’s financial data and past chats to give personalized advice. Include specific numbers and examples where relevant, explain your reasoning, and offer actionable steps they can take. Make the response comprehensive, not short or long, and avoid markdown or formal labels.
         """.trimIndent()
 
         return try {
+            Log.d("FinanceViewModel", "AI Chat prompt: $prompt")
             val response = generativeModel.generateContent(content { text(prompt) })
             val result = response.text ?: "Hmm, I’m not sure how to answer that right now!"
             _chatHistory.value += Pair(userQuery, result)
