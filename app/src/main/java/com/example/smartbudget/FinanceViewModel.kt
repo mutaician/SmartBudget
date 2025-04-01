@@ -17,19 +17,24 @@ data class Expense(
     val description: String,
     val amount: Double,
     val category: String? = null,
-    var date: Date = Date()
+    var date: Date = Date(),
+    var userId: String? = null
 )
 
 data class Debt(
     val description: String,
     val totalAmount: Double,
     val dueDate: Date? = null,
+    var userId: String? = null
+
 )
 
 data class Goal(
     val description: String,
     val targetAmount: Double,
-    val targetDate: Date? = null
+    val targetDate: Date? = null,
+    var userId: String? = null
+
 )
 
 
@@ -61,27 +66,37 @@ class FinanceViewModel : ViewModel() {
     private val _chatHistory = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val chatHistory: StateFlow<List<Pair<String, String>>> = _chatHistory.asStateFlow()
 
+    private var userId: String? = null
+
     // testing purposes for demo
     init {
         if (_expenses.value.isEmpty() && _debts.value.isEmpty() && _goals.value.isEmpty()) {
-            loadTestData()
+//            loadTestData()
         }
     }
-    fun loadTestData() {
+
+    fun setUserEmail(userId: String) { // Renamed to reflect UID
+        if (this.userId == null) {
+            this.userId = userId
+            loadTestData(userId)
+        }
+    }
+
+    private fun loadTestData(userId: String) {
         _expenses.value = listOf(
-            Expense("Mama Mboga (Veggies)", 150.0, "Food"),
-            Expense("Matatu to Campus", 70.0, "Transport"),
-            Expense("Chapo Smokie", 50.0, "Food"),
-            Expense("Airtime", 100.0, "Communication"),
-            Expense("Photocopy Notes", 30.0, "Education")
+            Expense("Mama Mboga (Veggies)", 150.0, "Food").apply { this.userId = userId },
+            Expense("Matatu to Campus", 70.0, "Transport").apply { this.userId = userId },
+            Expense("Chapo Smokie", 50.0, "Food").apply { this.userId = userId },
+            Expense("Airtime", 100.0, "Communication").apply { this.userId = userId },
+            Expense("Photocopy Notes", 30.0, "Education").apply { this.userId = userId }
         )
         _debts.value = listOf(
-            Debt("HELB Loan", 5000.0, Date(2025 - 1900, 11, 31)),
-            Debt("Roommate Borrowed", 200.0, Date(2025 - 1900, 4, 1))
+            Debt("HELB Loan", 5000.0, Date(2025 - 1900, 11, 31)).apply { this.userId = userId },
+            Debt("Roommate Borrowed", 200.0, Date(2025 - 1900, 4, 1)).apply { this.userId = userId }
         )
         _goals.value = listOf(
-            Goal("New Laptop", 15000.0, Date(2025 - 1900, 7, 31)),
-            Goal("Graduation Party", 3000.0, Date(2025 - 1900, 11, 1))
+            Goal("New Laptop", 15000.0, Date(2025 - 1900, 7, 31)).apply { this.userId = userId },
+            Goal("Graduation Party", 3000.0, Date(2025 - 1900, 11, 1)).apply { this.userId = userId }
         )
     }
 
@@ -223,7 +238,11 @@ class FinanceViewModel : ViewModel() {
             - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
             - Today's date is  is ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())}
         
-            Act as a financial expert and provide a detailed, thorough response in a friendly, conversational tone. Use the user’s financial data and past chats to give personalized advice. Include specific numbers and examples where relevant, explain your reasoning, and offer actionable steps they can take. Make the response comprehensive, not short or long, and avoid markdown or formal labels.
+            Act as a financial expert and provide a detailed, thorough response in a friendly, 
+            conversational tone. Use the user’s financial data and past chats to give personalized advice. 
+            Include specific numbers and examples where relevant, explain your reasoning, 
+            and offer actionable steps they can take. Make the response comprehensive, not short or long, 
+            and avoid markdown or formal labels.
         """.trimIndent()
 
         return try {

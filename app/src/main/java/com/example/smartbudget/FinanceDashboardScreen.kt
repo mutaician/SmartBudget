@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ComposableOpenTarget
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -47,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,6 +58,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,7 +71,8 @@ import java.util.Locale
 @Composable
 fun FinanceDashboardScreen(
     financeViewModel: FinanceViewModel,
-    onNavigateToChat: () -> Unit
+    onNavigateToChat: () -> Unit,
+    navController: NavController
 ) {
     val scrollState = rememberScrollState()
 
@@ -109,9 +119,14 @@ fun FinanceDashboardScreen(
 //            loadTestData(financeViewModel)
             SectionDivider()
             AIAnalysisSection(financeViewModel, scrollState, onNavigateToChat)
+            SectionDivider()
+            SignOutSection(navController)
+
         }
     }
 }
+
+
 
 @Composable
 private fun DashboardHeader() {
@@ -599,17 +614,17 @@ private fun EmptyState(message: String) {
     }
 }
 
-@Composable
-private fun loadTestData(financeViewModel: FinanceViewModel) {
-    Button(
-        onClick = { financeViewModel.loadTestData() },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-    ) {
-        Text("Load Test Data")
-    }
-}
+//@Composable
+//private fun loadTestData(financeViewModel: FinanceViewModel) {
+//    Button(
+//        onClick = { financeViewModel.loadTestData() },
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 16.dp, vertical = 16.dp)
+//    ) {
+//        Text("Load Test Data")
+//    }
+//}
 
 @Composable
 private fun AIAnalysisSection(
@@ -686,11 +701,40 @@ private fun AIAnalysisSection(
     }
 }
 
-@Preview(showSystemUi = true)
 @Composable
-fun FinanceDashboardScreenPreview() {
-    FinanceDashboardScreen(
-        onNavigateToChat = {},
-        financeViewModel = TODO()
-    )
+private fun SignOutSection(navController: NavController) {
+    val auth = FirebaseAuth.getInstance()
+    val context = LocalContext.current
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken("83956256458-b5g043l0598t2t0fh5gmljchodkcpjli.apps.googleusercontent.com")
+        .requestEmail()
+        .build()
+    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+
+    Button(
+        onClick = {
+            auth.signOut() // Firebase sign-out
+            googleSignInClient.signOut().addOnCompleteListener {
+                navController.navigate("login") {
+                    popUpTo("dashboard") { inclusive = true }
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text("Sign Out")
+    }
 }
+
+
+
+//@Preview(showSystemUi = true)
+//@Composable
+//fun FinanceDashboardScreenPreview() {
+//    FinanceDashboardScreen(
+//        onNavigateToChat = {},
+//        financeViewModel = TODO()
+//    )
+//}
