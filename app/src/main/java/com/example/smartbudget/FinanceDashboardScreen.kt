@@ -75,6 +75,7 @@ fun FinanceDashboardScreen(
     navController: NavController
 ) {
     val scrollState = rememberScrollState()
+    val currentEmail by financeViewModel.currentEmail.collectAsState()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -104,7 +105,7 @@ fun FinanceDashboardScreen(
                 .verticalScroll(scrollState)
                 .padding(paddingValues)
         ) {
-            DashboardHeader()
+            DashboardHeader(currentEmail)
             ExpenseInputSection(financeViewModel)
             SectionDivider()
             ExpenseHistorySection(financeViewModel)
@@ -127,12 +128,23 @@ fun FinanceDashboardScreen(
 
 
 @Composable
-private fun DashboardHeader() {
-    Text(
-        text = stringResource(R.string.dashboard_title),
-        style = MaterialTheme.typography.titleLarge,
+private fun DashboardHeader(currentEmail: String?) {
+    Column(
         modifier = Modifier.padding(16.dp)
-    )
+    ) {
+        Text(
+            text = stringResource(R.string.dashboard_title),
+            style = MaterialTheme.typography.titleLarge
+        )
+        currentEmail?.let {
+            Text(
+                text = "Logged in as: $it",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
 }
 
 @Composable

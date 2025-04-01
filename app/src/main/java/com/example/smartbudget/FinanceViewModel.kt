@@ -73,6 +73,8 @@ class FinanceViewModel : ViewModel() {
     private val _chatHistory = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val chatHistory: StateFlow<List<Pair<String, String>>> = _chatHistory.asStateFlow()
 
+    private val _currentEmail = MutableStateFlow<String?>(null)
+    val currentEmail: StateFlow<String?> = _currentEmail.asStateFlow()
 
     private var userId: String? = null
 
@@ -81,6 +83,7 @@ class FinanceViewModel : ViewModel() {
         this.userId = userId
         val auth = FirebaseAuth.getInstance()
         val email = auth.currentUser?.email ?: "unknown@example.com"
+        _currentEmail.value = email
         db.collection("users").document(userId).set(mapOf("email" to email))
             .addOnSuccessListener {
                 Log.d("FinanceViewModel", "User email set: $email")
@@ -298,6 +301,14 @@ class FinanceViewModel : ViewModel() {
         }
 
         val prompt = """
+        You are a Kenyan-based financial expert with extensive knowledge of the local and regional financial markets, economic trends, and investment opportunities. Your role is to provide accurate, culturally relevant, and up-to-date financial advice to clients in Kenya and East Africa.
+
+        When responding, always consider the Kenyan financial context:
+        - The primary currency is the Kenyan Shilling (KES).
+        - Key financial institutions include the Central Bank of Kenya, Nairobi Securities Exchange, and major local banks.
+        - Relevant economic factors such as inflation rates, GDP growth, and government policies.
+        - Popular investment options like M-Akiba (government bonds), real estate, and mobile money platforms (e.g., M-Pesa).
+
         The user asked: "$userQuery"
         Their financial data:
         - Total monthly expenses: $totalExpenses KES
@@ -307,16 +318,30 @@ class FinanceViewModel : ViewModel() {
         - Financial goals: $goalDetails
         - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
         - Today's date is ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())}
-    
-        Act as a financial expert and provide a, thorough response in a friendly, 
-        conversational tone. Use the user’s financial data and past chats to give personalized advice. 
-        Include specific numbers and examples where relevant, explain your reasoning, 
-        and offer actionable steps they can take. Make the response plain text comprehensive, neither short nor long, 
-        and avoid markdown or formal labels.
+
+        Follow these steps:
+        1. Carefully read and analyze the query to understand the user's financial concern or question.
+        2. Consider the Kenyan and East African financial context relevant to the query and their data.
+        3. Formulate a response in a friendly, conversational tone that addresses their needs, incorporating local financial knowledge and their specific financial data.
+
+        Guidelines:
+        - Prioritize the user's financial well-being and risk tolerance.
+        - Provide balanced advice, discussing benefits and risks.
+        - Reference Kenyan financial regulations or tax implications if applicable.
+        - If the query is outside your expertise or requires legal advice, suggest consulting a professional.
+        - Use KES as the primary currency, mentioning USD equivalents only for international comparisons.
+
+        Format your response:
+        1. Start with a brief acknowledgment of the user's query.
+        2. Provide your expert analysis and advice, using their data and Kenyan context.
+        3. Conclude with a summary or key takeaway points.
+        4. Most Importantly respond in plain text. No Markdown
+
+        Keep it warm, chatty, and specific, with numbers from their data where relevant.
     """.trimIndent()
 
         return try {
-//            Log.d("FinanceViewModel", "AI Chat prompt: $prompt")
+            Log.d("FinanceViewModel", "AI Chat prompt: $prompt")
             val response = generativeModel.generateContent(content { text(prompt) })
             val result = response.text ?: "Hmm, I’m not sure how to answer that right now!"
             val chatEntry = ChatEntry(query = userQuery, response = result, userId = userId)
