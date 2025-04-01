@@ -115,8 +115,6 @@ fun FinanceDashboardScreen(
             SectionDivider()
             GoalsInputSection(financeViewModel)
             GoalsSummarySection(financeViewModel)
-//            SectionDivider()
-//            loadTestData(financeViewModel)
             SectionDivider()
             AIAnalysisSection(financeViewModel, scrollState, onNavigateToChat)
             SectionDivider()
@@ -613,18 +611,6 @@ private fun EmptyState(message: String) {
         )
     }
 }
-
-//@Composable
-//private fun loadTestData(financeViewModel: FinanceViewModel) {
-//    Button(
-//        onClick = { financeViewModel.loadTestData() },
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(horizontal = 16.dp, vertical = 16.dp)
-//    ) {
-//        Text("Load Test Data")
-//    }
-//}
 
 @Composable
 private fun AIAnalysisSection(

@@ -4,6 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,35 +17,39 @@ import java.util.Date
 import java.util.Locale
 
 data class Expense(
-    val description: String,
-    val amount: Double,
+    val description: String = "",
+    val amount: Double = 0.0,
     val category: String? = null,
-    var date: Date = Date(),
-    var userId: String? = null
+    val userId: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 data class Debt(
-    val description: String,
-    val totalAmount: Double,
+    val description: String = "",
+    val totalAmount: Double = 0.0,
     val dueDate: Date? = null,
-    var userId: String? = null
-
+    val userId: String? = null
 )
 
 data class Goal(
-    val description: String,
-    val targetAmount: Double,
+    val description: String = "",
+    val targetAmount: Double = 0.0,
     val targetDate: Date? = null,
-    var userId: String? = null
+    val userId: String? = null
+)
 
+data class ChatEntry(
+    val query: String = "",
+    val response: String = "",
+    val userId: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 
 class FinanceViewModel : ViewModel() {
-    private val _uiState: MutableStateFlow<UiState> =
-        MutableStateFlow(UiState.Initial)
-    val uiState: StateFlow<UiState> =
-        _uiState.asStateFlow()
+    private val db = FirebaseFirestore.getInstance()
+    private val _uiState: MutableStateFlow<UiState> = MutableStateFlow(UiState.Initial)
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val generativeModel = GenerativeModel(
         modelName = "gemini-2.0-flash-lite",
@@ -66,77 +73,138 @@ class FinanceViewModel : ViewModel() {
     private val _chatHistory = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val chatHistory: StateFlow<List<Pair<String, String>>> = _chatHistory.asStateFlow()
 
+
     private var userId: String? = null
 
-    // testing purposes for demo
-    init {
-        if (_expenses.value.isEmpty() && _debts.value.isEmpty() && _goals.value.isEmpty()) {
-//            loadTestData()
-        }
+
+    fun setUserEmail(userId: String) {
+        this.userId = userId
+        val auth = FirebaseAuth.getInstance()
+        val email = auth.currentUser?.email ?: "unknown@example.com"
+        db.collection("users").document(userId).set(mapOf("email" to email))
+            .addOnSuccessListener {
+                Log.d("FinanceViewModel", "User email set: $email")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FinanceViewModel", "Failed to set user email: ${e.message}")
+            }
+        listenToExpenses(userId)
+        listenToDebts(userId)
+        listenToGoals(userId)
+        listenToChatHistory(userId)
+
     }
 
-    fun setUserEmail(userId: String) { // Renamed to reflect UID
-        if (this.userId == null) {
-            this.userId = userId
-            loadTestData(userId)
-        }
+    private fun listenToExpenses(userId: String) {
+        db.collection("users").document(userId).collection("expenses")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("FinanceViewModel", "Firestore listener error: ${e.message}")
+                    return@addSnapshotListener
+                }
+                val expenses = snapshot?.toObjects(Expense::class.java) ?: emptyList()
+                _expenses.value = expenses
+                updateCategorySpending()
+            }
     }
 
-    private fun loadTestData(userId: String) {
-        _expenses.value = listOf(
-            Expense("Mama Mboga (Veggies)", 150.0, "Food").apply { this.userId = userId },
-            Expense("Matatu to Campus", 70.0, "Transport").apply { this.userId = userId },
-            Expense("Chapo Smokie", 50.0, "Food").apply { this.userId = userId },
-            Expense("Airtime", 100.0, "Communication").apply { this.userId = userId },
-            Expense("Photocopy Notes", 30.0, "Education").apply { this.userId = userId }
-        )
-        _debts.value = listOf(
-            Debt("HELB Loan", 5000.0, Date(2025 - 1900, 11, 31)).apply { this.userId = userId },
-            Debt("Roommate Borrowed", 200.0, Date(2025 - 1900, 4, 1)).apply { this.userId = userId }
-        )
-        _goals.value = listOf(
-            Goal("New Laptop", 15000.0, Date(2025 - 1900, 7, 31)).apply { this.userId = userId },
-            Goal("Graduation Party", 3000.0, Date(2025 - 1900, 11, 1)).apply { this.userId = userId }
-        )
+    private fun listenToDebts(userId: String) {
+        db.collection("users").document(userId).collection("debts")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("FinanceViewModel", "Firestore debts listener error: ${e.message}")
+                    return@addSnapshotListener
+                }
+                val debts = snapshot?.toObjects(Debt::class.java) ?: emptyList()
+                _debts.value = debts
+            }
     }
+
+    private fun listenToGoals(userId: String) {
+        db.collection("users").document(userId).collection("goals")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("FinanceViewModel", "Firestore goals listener error: ${e.message}")
+                    return@addSnapshotListener
+                }
+                val goals = snapshot?.toObjects(Goal::class.java) ?: emptyList()
+                _goals.value = goals
+            }
+    }
+
+    private fun listenToChatHistory(userId: String) {
+        db.collection("users").document(userId).collection("chat_history")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("FinanceViewModel", "Firestore chat history listener error: ${e.message}")
+                    return@addSnapshotListener
+                }
+                val chatEntries = snapshot?.toObjects(ChatEntry::class.java) ?: emptyList()
+                _chatHistory.value = chatEntries.map { it.query to it.response }
+            }
+    }
+
+
+
 
     fun addExpense(description: String, amount: Double, category: String?) {
-        val newExpense = Expense(description = description, amount = amount, category = category)
-        _expenses.value += newExpense
+        val userId = this.userId ?: return
+        val newExpense = Expense(description = description, amount = amount, category = category, userId = userId)
+        db.collection("users").document(userId).collection("expenses").add(newExpense)
+            .addOnSuccessListener {
+                Log.d("FinanceViewModel", "Expense added to Firestore: $newExpense")
+            }
+            .addOnFailureListener { e ->
+                Log.d("FinanceViewModel", "Failure to add expense: ${e.message}")
+            }
         _categorySuggestion.value = null
         updateCategorySpending()
     }
 
     fun addDebt(description: String, totalAmount: Double, dueDateString: String) {
-        val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US) // Date formatter
+        val userId = this.userId ?: return
+        val dateFormatter = SimpleDateFormat("MM/dd/yyyy", Locale.US)
         var dueDate: Date? = null
         if (dueDateString.isNotBlank()) {
             try {
-                dueDate = dateFormatter.parse(dueDateString) // Parse due date string to Date
+                dueDate = dateFormatter.parse(dueDateString)
             } catch (e: ParseException) {
                 Log.e("FinanceViewModel", "Error parsing due date: $dueDateString", e)
             }
         }
 
-        val newDebt = Debt(description = description, totalAmount = totalAmount, dueDate = dueDate)
-        _debts.value = _debts.value + newDebt // Add new debt to the list
-        Log.d("FinanceViewModel", "Debt added: $newDebt") // Log the new debt
-        Log.d("FinanceViewModel", "Updated debts  list: ${_debts.value}")
+        val newDebt = Debt(description = description, totalAmount = totalAmount, dueDate = dueDate, userId = userId)
+        db.collection("users").document(userId).collection("debts").add(newDebt)
+            .addOnSuccessListener {
+                Log.d("FinanceViewModel", "Debt added to Firestore: $newDebt")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FinanceViewModel", "Failed to add debt: ${e.message}")
+            }
     }
 
     fun addGoal(description: String, targetAmount: Double, targetDate: String?) {
+        val userId = this.userId ?: return
         val date = targetDate?.let {
             SimpleDateFormat("MM/dd/yyyy", Locale.US).parse(it)
         }
-        val newGoal = Goal(description, targetAmount, date)
-        _goals.value += newGoal
+        val newGoal = Goal(description = description, targetAmount = targetAmount, targetDate = date, userId = userId )
+        db.collection("users").document(userId).collection("goals").add(newGoal)
+            .addOnSuccessListener {
+                Log.d("FinanceViewModel", "Goal added to Firestore: $newGoal")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FinanceViewModel", "Failed to add goal: ${e.message}")
+            }
     }
 
     private fun updateCategorySpending() {
-        val currentMonth = Calendar.getInstance().get(Calendar.MONTH) // 0-11 (Jan-Dec)
+        val currentMonth = Calendar.getInstance().get(Calendar.MONTH)
         val currentYear = Calendar.getInstance().get(Calendar.YEAR)
         val monthlyExpenses = _expenses.value.filter { expense ->
-            val expenseCal = Calendar.getInstance().apply { time = expense.date }
+            val expenseCal = Calendar.getInstance().apply { timeInMillis = expense.timestamp }
             expenseCal.get(Calendar.MONTH) == currentMonth && expenseCal.get(Calendar.YEAR) == currentYear
         }
         val spendingByCategory = monthlyExpenses
@@ -164,6 +232,7 @@ class FinanceViewModel : ViewModel() {
     }
 
     suspend fun getFinancialAnalysis(): String {
+        this.userId ?: return "Please log in first."
         val expenses = _expenses.value
         val debts = _debts.value
         val goals = _goals.value
@@ -213,6 +282,7 @@ class FinanceViewModel : ViewModel() {
     }
 
     suspend fun getChatResponse(userQuery: String): String {
+        val userId = this.userId ?: return "Please log in first."
         val expenses = _expenses.value
         val debts = _debts.value
         val goals = _goals.value
@@ -228,34 +298,39 @@ class FinanceViewModel : ViewModel() {
         }
 
         val prompt = """
-            The user asked: "$userQuery"
-            Their financial data:
-            - Total monthly expenses: $totalExpenses KES
-            - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
-            - Total debt: $totalDebt KES
-            - Debt details: $debtDetails
-            - Financial goals: $goalDetails
-            - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
-            - Today's date is  is ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())}
-        
-            Act as a financial expert and provide a detailed, thorough response in a friendly, 
-            conversational tone. Use the user’s financial data and past chats to give personalized advice. 
-            Include specific numbers and examples where relevant, explain your reasoning, 
-            and offer actionable steps they can take. Make the response comprehensive, not short or long, 
-            and avoid markdown or formal labels.
-        """.trimIndent()
+        The user asked: "$userQuery"
+        Their financial data:
+        - Total monthly expenses: $totalExpenses KES
+        - Spending by category: ${spendingByCategory.map { "${it.key}: ${it.value} KES" }.joinToString(", ")}
+        - Total debt: $totalDebt KES
+        - Debt details: $debtDetails
+        - Financial goals: $goalDetails
+        - Past chat history: ${_chatHistory.value.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
+        - Today's date is ${SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())}
+    
+        Act as a financial expert and provide a, thorough response in a friendly, 
+        conversational tone. Use the user’s financial data and past chats to give personalized advice. 
+        Include specific numbers and examples where relevant, explain your reasoning, 
+        and offer actionable steps they can take. Make the response plain text comprehensive, neither short nor long, 
+        and avoid markdown or formal labels.
+    """.trimIndent()
 
         return try {
-            Log.d("FinanceViewModel", "AI Chat prompt: $prompt")
+//            Log.d("FinanceViewModel", "AI Chat prompt: $prompt")
             val response = generativeModel.generateContent(content { text(prompt) })
             val result = response.text ?: "Hmm, I’m not sure how to answer that right now!"
-            _chatHistory.value += Pair(userQuery, result)
+            val chatEntry = ChatEntry(query = userQuery, response = result, userId = userId)
+            db.collection("users").document(userId).collection("chat_history").add(chatEntry)
+                .addOnSuccessListener {
+                    Log.d("FinanceViewModel", "Chat entry added: $chatEntry")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("FinanceViewModel", "Failed to add chat entry: ${e.message}")
+                }
             result
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "Chat response failed: ${e.message}")
-            val error = "Oops, something went wrong with my reply!"
-            _chatHistory.value += Pair(userQuery, error)
-            error
+            "Oops, something went wrong with my reply!"
         }
     }
 
