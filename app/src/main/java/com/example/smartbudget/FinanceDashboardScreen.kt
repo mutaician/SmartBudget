@@ -48,9 +48,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -88,15 +90,17 @@ fun FinanceDashboardScreen(
                 FloatingActionButton(
                     onClick = onNavigateToChat,
                     modifier = Modifier.align(Alignment.TopEnd)
+                        .size(70.dp),
+                    containerColor = Color(0xFF00A551)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Face,
-                        contentDescription = "Chat with AI"
+                        painter = painterResource(id = R.drawable.fab_icon),
+                        contentDescription = "Chat with AI" ,
+                        tint = Color.White
                     )
                 }
             }
         },
-//        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
 
         Column(

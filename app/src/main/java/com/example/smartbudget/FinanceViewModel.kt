@@ -62,8 +62,8 @@ class FinanceViewModel : ViewModel() {
     private val _categorySuggestion = MutableStateFlow<String?>(null)
     val categorySuggestion: StateFlow<String?> = _categorySuggestion.asStateFlow()
 
-    private val _debts = MutableStateFlow<List<Debt>>(emptyList()) // Mutable StateFlow for debts
-    val debts: StateFlow<List<Debt>> = _debts.asStateFlow() // Public StateFlow for debts
+    private val _debts = MutableStateFlow<List<Debt>>(emptyList())
+    val debts: StateFlow<List<Debt>> = _debts.asStateFlow()
 
     private val _categorySpending = MutableStateFlow<Map<String, Double>>(emptyMap())
 
